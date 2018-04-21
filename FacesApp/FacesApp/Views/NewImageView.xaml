@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:FacesApp"
+             vm:VmLocator.AutoWireViewModel="True"
+             x:Class="FacesApp.Views.NewImageView">
+    <ContentPage.Content>
+        <StackLayout>
+            <Label Text="Nombre de la foto" />
+            <Entry Text="{Binding ImageName}" />
+            <Button Text="Capturar foto" Command="{Binding TakePhotoCommand}" />
+            <Image Source="{Binding Image}" HorizontalOptions="Center" HeightRequest="200" WidthRequest="200" Aspect="AspectFill" />
+        </StackLayout>
+    </ContentPage.Content>
+</ContentPage>

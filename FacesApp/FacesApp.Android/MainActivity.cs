@@ -1,13 +1,8 @@
-﻿using System;
-
-using Android.App;
+﻿using Android.App;
 using Android.Content.PM;
-using Android.Runtime;
-using Android.Views;
-using Android.Widget;
 using Android.OS;
+using Android.Runtime;
 using Plugin.Permissions;
-using Plugin.Permissions.Abstractions;
 
 namespace FacesApp.Droid
 {
@@ -29,8 +24,5 @@ namespace FacesApp.Droid
         {
             PermissionsImplementation.Current.OnRequestPermissionsResult(requestCode, permissions, grantResults);
         }
-
-
     }
 }
-

@@ -50,7 +50,9 @@
 	<string>LaunchScreen</string>
 	<key>CFBundleName</key>
 	<string>FacesApp</string>
-	<key>NSCameraUsageDescription</key>
-	<string>Necesitamos usar la cámara</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+<string>This app needs access to photos.</string>
+<key>NSPhotoLibraryAddUsageDescription</key>
+<string>This app needs access to the photo gallery.</string>
 </dict>
 </plist>

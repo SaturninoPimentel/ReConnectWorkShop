@@ -1,34 +1,44 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
+﻿using FacesApp.Services.Navigation;
+using System.Threading.Tasks;
 using Xamarin.Forms;
+using Xamarin.Forms.Xaml;
 
 namespace FacesApp
 {
-	public partial class App : Application
-	{
-		public App ()
-		{
-			InitializeComponent();
+    [XamlCompilation(XamlCompilationOptions.Compile)]
+    public partial class App : Application
+    {
+        public App()
+        {
+            InitializeComponent();
+            if (Device.RuntimePlatform == Device.UWP)
+            {
+                InitNavigation();
+            }
+        }
 
-			MainPage = new FacesApp.MainPage();
-		}
+        private Task InitNavigation()
+        {
+            INavigationServices navigationService = VmLocator.Resolve<INavigationServices>();
+            return navigationService.InitializeAsync();
+        }
 
-		protected override void OnStart ()
-		{
-			// Handle when your app starts
-		}
+        protected override async void OnStart()
+        {
+            if (Device.RuntimePlatform != Device.UWP)
+            {
+                await InitNavigation();
+            }
+        }
 
-		protected override void OnSleep ()
-		{
-			// Handle when your app sleeps
-		}
+        protected override void OnSleep()
+        {
+            // Handle when your app sleeps
+        }
 
-		protected override void OnResume ()
-		{
-			// Handle when your app resumes
-		}
-	}
+        protected override void OnResume()
+        {
+            // Handle when your app resumes
+        }
+    }
 }

@@ -1,478 +1,279 @@
-## Re Connect CDMX ##
-##### Humberto Jaimes - humberto@humbertojaimes.net #####
-##### Saturnino Pimentel - @saturpimentel #####
-# Creando y consumiendo Azure Functions #
+## Azure Bootcamp ##
+##### Humberto Jaimes - humberto@humbertojaimes.net
+##### Saturnino Pimentel - [@saturpimentel](https://twitter.com/saturpimentel)
+# Creando y consumiendo Azure Functions
 
 A lo largo de este laboratorio crearemos un par de Azure Functions las cuales consumiremos desde una aplicación Xamarin.Forms
 
-## Requerimientos ##
+## Requisitos
 
-- Tener 1 cuenta Azure activa, puede ser una cuenta gratuita.
-- Tener instaladas las herramientas de Xamarin.
+- Tener una cuenta Azure activa, puede ser una cuenta gratuita.
+- Visual Studio 15.3 o superior
+  - Xamarin
+  - Workload de Azure
+  - Extension de functions y web job tools
+  
 
-## Creando y configurando los servicios en Azure ##
+## Creando y configurando los servicios en Azure
 
-1. Crea un nuevo grupo de recursos en Azure llamado "Reconnect"
+1. Crea un nuevo grupo de recursos en Azure llamado "**AzureBootcamp-rg**"
 
 ![](Images/ResourceGroup1.png)
 
 ![](Images/ResourceGroup2.png)
 
-2. Crea un nuevo recurso de tipo "Function App" y agregalo al grupo de recursos creado anteriormente. El nombre del recursos puede ser algo como "reconnect(tus iniciales)func" y la cuenta de storage "reconnect(tus iniciales)sto"
-
-![](Images/Function1.png)
-
-![](Images/Function2.png)
-
-3. Crea un recurso de tipo "Computer Vision  API" y al igual que en el caso anterior agregalo al grupo de recursos Reconnect. Siguiendo la nomenclatura este puede llamarse "reconnect(tus iniciales)vis"
+2. Crea un recurso de tipo "**Computer Vision  API**" y al igual que en el caso anterior agrégalo al grupo de recursos **AzureBootcamp-rg**. Nómbralo "**azurebootcamp(tus iniciales)vis**"
 
 ![](Images/vision1.png)
 
 ![](Images/Vision2.png)
 
-4. Ya con estos servicios generados debemos realizar unas configuraciones a cada uno.
+## Creando nuestra Azure Function App
 
-4.1 Primero debes acceder al storage para crear un nuevo contenedor de blobs llamado "faces"
+Microsoft nos permite utilizar el enfoque Serverless al correr nuestro código personalizado en **Azure Functions** respondiendo a eventos algo que también es conocido como **Functions as a Service**.
 
-![](Images/blob1.png)
+1. Como primer paso crearemos nuestro proyecto de **Azure Functions** para esto genera una nueva solución y selecciona el tipo de proyecto **Azure Function**.
 
-![](Images/blob2.png)
+![](Images/AzureFunctionProject.png)
 
-**Importante:** Darle permisos de contenedor, al nuevo que generemos.
+### Creando primer función para análisis de datos
 
-![](Images/blob3.png)
+1. Crearemos una clase **FaceRectangle** que herede de la clase **TableEntity** que nos servirá primero para obtener los metadatos de la imagen que enviamos a Computer Vision y después para almacenar información en nuestro table storage después del análisis de las imágenes.
+```
+public class FaceRectangle : TableEntity
+    {
+        public string ImageFile { get; set; }
 
-4.2 Ahora accede al recurso de Vision API y obtén la URL y llave con la que se puede consumir.
+        public int Left { get; set; }
 
-![](Images/vision3.png)
+        public int Top { get; set; }
 
-Selecciona "overview"
-![](Images/vision4.png)
+        public int Width { get; set; }
 
-Copia la URL del servicio que muestra, tenla disponible para los siguientes pasos y accede a las "Access Keys"
+        public int Height { get; set; }
 
-![](Images/vision5.png)
+        public int Age { get; set; }
 
-Copia cualquiera de las dos llaves, esta se usará en el siguiente paso
-
-![](Images/vision6.png)
-
-4.3 Ahora hay que acceder a la "Function App" para pasarle esa llave.
-
-![](Images/Function3.png)
-
-Selecciona la app creada para este ejercicio y accede a la parte de "application settings"
-
-![](Images/Function4.png)
-
-Agrega un nuevo setting llamado "Vision_API_Subscription_Key" y como valor pon la llave copiada del Api de Vision.
-
-![](Images/Function5.png)
-
-Guarda los cambios
-
-![](Images/Function6.png)
-
-Con esto tenemos listo todo lo necesario para comenzar a crear nuestras funciones.
-
-## Creando las Azure Function ##
-
-1. Crea una función presionando el "+" junto a tu app.
-
-![](Images/Function7.png)
-
-Selecciona la opción "Custom Function" en la siguiente ventana.
-
-![](Images/Function8.png)
-
-Utilizaremos una de tipo "Blob Trigger"
-
-![](Images/Function9.png)
-
-La función debe ser con C# como lenguaje, hay que definirle un nombre en este ejemplo se llama "AnalyzeFace".
-
-Otro punto importante es definir la ruta dentro del storage que debe revisar, aquí debemos poner el nombre de nuestro contenedor y el tipo de archivo que esperamos.
-
-![](Images/Function10.png)
-
-2. Para completar la configuración de la función debemos configurar las entradas y salidas de la función.
-
-El ejemplo tomara un blob, lo analizará y guardara los resultados en una Table dentro del Storage de la función.
-
-Esto se hace en la opción "Integrate" de la función.
-
-![](Images/Function11.png)
-
-La configuración de "Triggers" debe estar de este modo
-
-![](Images/Function12.png)
-
-En "OutPuts" hay que agregar uno de tipo Table Storage con los siguiente parametros.
-
-![](Images/function13.png)
-
-![](Images/Function14.png)
-
-![](Images/Function15.png)
-
-3. Este es el código que usaremos en la función, solo reemplaza la línea 41 con la url de tu API de Vision.
+        public string Gender { get; set; }
+    }
+```
+2. Crearemos la clase **Face** que nos servirá para almacenar la información de cada una de las caras que son encontradas por el API de Computer Vision.
 
 ```
-#r "Microsoft.WindowsAzure.Storage"
-#r "Newtonsoft.Json"
+public class Face
+    {
+        public int Age { get; set; }
 
+        public string Gender { get; set; }
+
+        public FaceRectangle FaceRectangle { get; set; }
+    }
+```
+3. Ahora crearemos la clase **ImageData** que contiene la información de todos los rostros que fueron detectados durante el análisis.
+
+```
+ public class ImageData
+    {
+        public List<Face> Faces { get; set; }
+    }
+```
+
+4. Ahora crearemos nuestra primer función con la ayuda de Visual Studio.
+
+4.1 Da click derecho en el proyecto y selecciona **Add**, después selecciona **New Azure Function**.
+
+![](Images/Func1.png)
+
+4.2 Agrega el nombre **AnalizeFaceFunction** y presiona **Add**.
+
+![](Images/Func2.png)
+
+4.3 Visual Studio te mostrará un asistente en el que podrás seleccionar el tipo de Trigger que utilizarás selecciona el **Blob Trigger** y en el campo indicado para el path escribe el nombre del 
+contenedor del blob.
+
+![](Images/func4.png)
+
+4.4 En la clase que Visual Studio genera de manera automática agrega los siguientes espacios de nombres.
+
+```
+using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Host;
+using Newtonsoft.Json;
+using System;
 using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using Newtonsoft.Json;
-using Microsoft.WindowsAzure.Storage.Table;
-
-public static async Task Run(Stream image, string name, IAsyncCollector<FaceRectangle> outTable, TraceWriter log)
-{
-    log.Info($"Inicio de la operación"); 
-    string result = await CallVisionAPI(image,log);
-    log.Info($"Resultado de la operación: {result}");
-
-    if (String.IsNullOrEmpty(result))
-    {
-        return;
-    }
-
-    ImageData imageData = JsonConvert.DeserializeObject<ImageData>(result);
-    log.Info($"imagenes:{imageData}");
-    foreach (Face face in imageData.Faces)
-    {
-        var faceRectangle = face.FaceRectangle;
-        faceRectangle.RowKey = Guid.NewGuid().ToString();
-        faceRectangle.PartitionKey = "Reconnect";
-        faceRectangle.ImageFile = name + ".jpg";
-        faceRectangle.Age=face.Age;
-        faceRectangle.Gender=face.Gender;
-        await outTable.AddAsync(faceRectangle);
-    }
-}
-
-static async Task<string> CallVisionAPI(Stream image,  TraceWriter log)
-{
-    using (var client = new HttpClient())
-    {
-        var content = new StreamContent(image);
-        var url = "https://southcentralus.api.cognitive.microsoft.com/vision/v1.0/analyze?visualFeatures=Faces&language=en";
-        client.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", Environment.GetEnvironmentVariable("Vision_API_Subscription_Key"));
-        content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-        var httpResponse = await client.PostAsync(url, content);
-
-        log.Info($"Estatus code {httpResponse.StatusCode}");
-        log.Info($"Content {await httpResponse.Content.ReadAsStringAsync()}");
-        if (httpResponse.StatusCode == HttpStatusCode.OK)
-        {
-            return await httpResponse.Content.ReadAsStringAsync();
-        }
-        
-    }
-    return null;
-}
-
-public class ImageData
-{
-    public List<Face> Faces { get; set; }
-}
-
-public class Face
-{
-    public int Age { get; set; }
-
-    public string Gender { get; set; }
-
-    public FaceRectangle FaceRectangle { get; set; }
-}
-
-public class FaceRectangle : TableEntity
-{
-    public string ImageFile { get; set; }
-
-    public int Left { get; set; }
-
-    public int Top { get; set; }
-
-    public int Width { get; set; }
-
-    public int Height { get; set; }
-
-    public int Age { get; set; }
-
-    public string Gender { get; set; }
-}
-
-```
-
-## Creando una segunda función para exponer los datos ##
-
-1. Crea una nueva función en tu misma Function App, en este caso utilizando la plantilla "HttpGet"
-
-![](Images/Function16.png)
-
-Los datos de esta nueva función son los siguientes. 
-
-*Nota: EL nombre de la tabla es sensible a mayúsculas y minúsculas.
-
-![](Images/Function17.png)
-
-2. Dentro de la parte de "Integrate" solo modificaremos el "Route Template" este valor indica la ruta con la que podemos invocar a la función.
-
-![](Images/Function18.png)
-
-3. Finalmente el código de la función es el siguiente. Es muy parecido al de la plantilla solo modificando la definición de Person y el campo con el que imprime el Log.
-
-```
-#r "Microsoft.WindowsAzure.Storage"
-
-using System.Net;
-using Microsoft.WindowsAzure.Storage.Table;
-
-public static HttpResponseMessage Run(HttpRequestMessage req, IQueryable<Person> inTable, TraceWriter log)
-{
-    var query = from person in inTable select person;
-    foreach (Person person in query)
-    {
-        log.Info($"Name:{person.ImageFile}");
-    }
-    return req.CreateResponse(HttpStatusCode.OK, inTable.ToList());
-}
-
-public class Person : TableEntity
-{
-    public string ImageFile { get; set; }
-
-    public int Left { get; set; }
-
-    public int Top { get; set; }
-
-    public int Width { get; set; }
-
-    public int Height { get; set; }
-
-    public int Age { get; set; }
-
-    public string Gender { get; set; }
-}
-```
-
-## Creando una app Xamarin que consuma las funciones ##
-
-1. El primer paso es crear una app Xamarin.Forms en blanco. Puede ser con Net Standard o con PCL.
-
-![](Images/Xamarin1.png)
-
-![](Images/Xamarin2.png)
-
-2. Cuando el proyecto se termine de crear instala el siguiente paquete NuGet en todos los proyectos.
-
-![](Images/Xamarin3.png)
-
-Y sigue las instrucciones del archivo que muestra el archivo que se abre después de instalarse el componente. 
-
-Ahora en el proyecto PCL o Net Standard instala los siguientes paquetes.
-
-![](Images/Xamarin4.png)
-![](Images/Xamarin5.png)
-![](Images/Xamarin6.png)
-
- 
-3. Crea una clase que se encargue de tomar las fotografías haciendo uso del NuGet de Media.
-
-La clase se llama "MediaHelper" y su contenido es el siguiente.
-
-Using:
-
-```
-using Plugin.Media;
-using System.Threading.Tasks;
-```
-Clase
-
-```
-public class MediaHelper
-    {
-        public static async Task<Photo> TakePhotoAsync(string name)
-        {
-            byte[] photo = null;
-            await Plugin.Media.CrossMedia.Current.Initialize();
-            if (Plugin.Media.CrossMedia.Current.IsCameraAvailable
-               && Plugin.Media.CrossMedia.Current.IsTakePhotoSupported)
-            {
-                var file = await CrossMedia.Current.TakePhotoAsync(new Plugin.Media.Abstractions.StoreCameraMediaOptions
-                {
-                    PhotoSize = Plugin.Media.Abstractions.PhotoSize.Full,
-                    Directory = "People",
-                    Name = name +".jpg",
-                    MaxWidthHeight = 512,
-                    AllowCropping = true
-                });
-
-                if (file != null)
-                    using (var photoStream = file.GetStream())
-                    {
-                        photo = new byte[photoStream.Length];
-                        await photoStream.ReadAsync(photo, 0, (int)photoStream.Length);
-                    }
-            }
-
-            return new Photo() { PhotoData = photo, Name= name + ".jpg" };
-        }
-    }
-```
-
-Como clase de apoyo crea una clase Photo, la cual contiene la fotografía tomada y el nombre del archivo.
-
-```
-public class Photo
-    {
-        public byte[] PhotoData
-        {
-            get;
-            set;
-        }
-
-        public string Name
-        {
-            get;
-            set;
-        }
-    }
-```
-
-4. Ahora crearemos una clase que envié la fotografía al contenedor de blobs que generamos en Azure. Esta clase se llama "StorageHelper" y este es su contenido
-
-Using
-```
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
-using System.IO;
 using System.Threading.Tasks;
 ```
 
-Clase
+4.5 También agrega el siguiente código a tu función el cuál enviará tu imagen al API de Computer Vision y guardará los resultados en un **Table Storage** utilizando las clases que anteriormente creamos.
 
 ```
- public class StorageHelper
+public static class AnalizeFaceFunction
     {
-        
+        private static string _url = "https://southcentralus.api.cognitive.microsoft.com/vision/v1.0/analyze?visualFeatures=Faces&language=en";
 
-        public static async Task UploadPhoto(Photo photoInfo)
+        [FunctionName(nameof(AnalizeFaceFunction))]
+        public static async Task Run(
+            [BlobTrigger("facescontainer/{name}.png", Connection = "")]Stream image,
+            string name,
+            [Table("facestable", Connection = "")] IAsyncCollector<FaceRectangle> outTable,
+            TraceWriter log)
         {
-            try
+            string apiResult = await CallVisionApiAsync(image, log);
+            log.Info($"Resultado de la operación: {apiResult}");
+
+            if (!string.IsNullOrEmpty(apiResult))
             {
-                using (var stream = new MemoryStream())
+                ImageData imageData = JsonConvert.DeserializeObject<ImageData>(apiResult);
+                log.Info($"imagenes:{imageData}");
+                foreach (Face face in imageData.Faces)
                 {
-
-                    var container = GetContainer();
-
-                    var fileBlob = container.GetBlockBlobReference(photoInfo.Name);
-
-                    await fileBlob.UploadFromByteArrayAsync(photoInfo.PhotoData, 0, photoInfo.PhotoData.Length);
-
+                    FaceRectangle faceRectangle = face.FaceRectangle;
+                    faceRectangle.RowKey = Guid.NewGuid().ToString();
+                    faceRectangle.PartitionKey = "AzureBootCamp";
+                    faceRectangle.ImageFile = name + ".png";
+                    faceRectangle.Age = face.Age;
+                    faceRectangle.Gender = face.Gender;
+                    await outTable.AddAsync(faceRectangle);
                 }
             }
-            catch (Exception ex)
+        }
+
+        private static async Task<string> CallVisionApiAsync(Stream image, TraceWriter log)
+        {
+            using (HttpClient client = new HttpClient())
             {
+                StreamContent content = new StreamContent(image);
 
-                throw;
+                client.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", Environment.GetEnvironmentVariable("Vision_API_Subscription_Key"));
+                content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+                HttpResponseMessage httpResponse = await client.PostAsync(_url, content);
+
+                log.Info($"Estatus code {httpResponse.StatusCode}");
+                log.Info($"Content {await httpResponse.Content.ReadAsStringAsync()}");
+                if (httpResponse.StatusCode == HttpStatusCode.OK)
+                {
+                    return await httpResponse.Content.ReadAsStringAsync();
+                }
             }
-
-        }
-
-        private static CloudBlobContainer GetContainer()
-        {
-            var account = CloudStorageAccount.Parse(Datos de tu storage);
-
-            var client = account.CreateCloudBlobClient();
-            var containers = client.ListContainersSegmentedAsync(null).Result;
-            return client.GetContainerReference("faces");
+            return null;
         }
     }
 ```
+> Nota: Revisa el archivo **local.settings.json** y valida que tiene los siguientes datos.
 
-5. Finalmente tendremos una clase que consuma la función que devuelve la información almacenada.  La clase RestHelper contiene lo siguiente:
-
-Usings
 ```
+{
+    "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "AzureWebJobsDashboard": "UseDevelopmentStorage=true",
+    "Vision_API_Subscription_Key": "llave"
+  }
+}
+```
+
+### Creando una segunda función para exponer los datos
+
+1. En este paso agregaremos una función que nos permita consultar los registros de nuestro table storage.
+
+1.1 Da click derecho en el proyecto y selecciona **Add**, después selecciona **New Azure Function**.
+
+![](Images/Func1.png)
+
+1.2 Agrega el nombre **GetFacesFuntion** y da click en **Add**.
+
+![](Images/Func5.png)
+
+1.3 Agrega las siguientes referencias.
+
+```
+using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.Azure.WebJobs.Host;
+using System.Linq;
+using System.Net;
 using System.Net.Http;
-using System.Threading.Tasks;
 ```
-Clase
+
+1.4 Ahora cambia el código de la clase por el que se muestra a continuación.
 
 ```
-public class RestHelper
+public static class GetFacesFuntion
     {
-        static HttpClient httpClient = new HttpClient();
-
-        public static async Task<List<Person>> GetFaces()
+        [FunctionName(nameof(GetFacesFuntion))]
+        public static HttpResponseMessage Run(
+            [HttpTrigger(AuthorizationLevel.Function, "get", Route = null)]HttpRequestMessage req,
+            [Table("facestable", "AzureBootCamp")]IQueryable<FaceRectangle> table,
+            TraceWriter log)
         {
-            var response = await httpClient.GetStringAsync("https://tusitio.azurewebsites.net/api/faceinformation");
-            List<Person> persons =
-            Newtonsoft.Json.JsonConvert.DeserializeObject<List<Person>>(response);
-            return persons;
+            return req.CreateResponse(HttpStatusCode.OK, table.ToList());
         }
-
     }
 ```
 
-Esta ultima clase requiere de otra clase con la información de las personas. Crea una clase "Person" con la siguiente definición
+## Publicando nuestras funciones a Azure con Visual Studio
+
+En este punto hemos creado nuestras funciones, ahora podemos realizar el proceso de publicación desde **Visual Studio**.
+
+1. Da click derecho en el proyecto y selecciona **Publish**
+ 
+![](Images/PublishAzureFunctionApp0.png)
+
+2. Visual Studio te presentará la siguiente pantalla, por favor selecciona **Create New**.
+
+![](Images/PublishAzureFunctionApp1.png)
+
+3. Ahora agrega los datos que te solicita el formulario de publicación (si es necesario agrega tus iniciales al final para evitar conflictos).
+
+![](Images/PublishAzureFunctionApp2.png)
+
+4. Al presionar el botón **Create** Visual Studio comenzará el proceso de creación de los recursos y publicación de nuestras funciones.
+
+![](Images/PublishAzureFunctionApp4.png)
+
+5. Al terminar el proceso de publicación selecciona la opción **Manage Application Settings** y agrega el application setting **Vision_API_Subscription_Key** con la llave que te proporcione el servicio de **Computer Vision** que hemos creado anteriormente.
+
+![](Images/PublishAzureFunctionApp3.png)
+
+
+## Probando nuestras Azure Functions con una app Xamarin
+
+1. Clona el proyecto [ReConnectWorkShop](https://github.com/SaturninoPimentel/ReConnectWorkShop).
+Este proyecto permite subir una imagen al blob storage y consumir la información del análisis de **Computer Vision API**.
+Para poder probar la aplicación agrega los datos que se solicitan en el proyecto en la clase **Constants**.
+ 
 
 ```
-public class Person
-        {
-            public string ImageFile { get; set; }
 
-            public Uri ImageUri { get => new Uri("https://reconnecthjrstorage.blob.core.windows.net/faces/"+ImageFile); }
-
-            public int Age { get; set; }
-
-            public string Gender { get; set; }
-        }
-```
-
-6. Para  probar lo anterior necesitamos una interfaz de usuario, puede ser algo muy simple como esto (todo dentro de la etiqueta ContentPage en el archivo MainPage.xaml):
+    public class Constants
+    {
+        public const string StorageEndPoint = "";
+        public const string BlobStorageUrl = "";
+        public const string ContainerName = "";
+        public const string PersonApiUrl = "";
+    }
 
 ```
-<StackLayout>
-        <Label Text="Nombre de la foto" />
-        <Entry x:Name="entImageName" />
-        <Button Clicked="BtnTakePhoto_Clicked"  Text="Capturar foto"/>
-        <Image x:Name="imgPhoto" HorizontalOptions="Center" HeightRequest="200" WidthRequest="200" Aspect="AspectFill"/>
-        <ListView x:Name="lvPersons">
-            <ListView.ItemTemplate>
-                <DataTemplate>
-                    <ViewCell>
-                        <StackLayout Orientation="Horizontal">
-                            <Image HeightRequest="70" WidthRequest="70" Aspect="AspectFill" Source="{Binding ImageUri}" />
-                           
-                            <Label Text="{Binding Age}" />
-                        </StackLayout>
-                    </ViewCell>
-                </DataTemplate>
-            </ListView.ItemTemplate>
-        </ListView>
-    </StackLayout>
-```
 
-Y el código que hace funcionar esa interfaz es el siguiente (Dentro de MainPage.xaml.cs)
+1.1 Copia y pega la cadena de conexión del storage en el campo **StorageEndPoint**.
 
-```
-private async void BtnTakePhoto_Clicked(object sender, EventArgs e)
-        {
-       
-            string name = entImageName.Text;
+![](Images/ConnectionStringStorage.png)
 
-            Photo photo = await MediaHelper.TakePhotoAsync(name);
-            imgPhoto.Source = ImageSource.FromStream(() => new MemoryStream(photo.PhotoData));
-            await StorageHelper.UploadPhoto(photo);
-            await Task.Delay(5000);
-            lvPersons.ItemsSource = await RestHelper.GetFaces();
-        }
-```
+1.2 Copia y pega la url del blob storage que creamos anteriormente en el campo **BlobStorageUrl**. También copia y pega el nombre del contenedor en el campo **ContainerName**.
 
-7. Ejecuta la app en cualquiera de las plataformas y haz la prueba tomando una fotografía y mandándola al contenedor.
+![](Images/blobstorageurl.png)
+
+1.3 Copia y pega la url de la función **AnalizeFaceFunction** en el campo **PersonApiUrl**.
+
+![](Images/functionurl.png)
+
+1.4 Ahora ejecuta la aplicación y prueba el flujo de la misma.
+
+![](Images/app1.png)
+![](Images/app2.png)
+
+
 
